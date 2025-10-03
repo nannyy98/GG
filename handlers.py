@@ -73,27 +73,23 @@ class MessageHandler:
                 self.handle_user_state(message)
             
             # Обрабатываем кнопки меню
-            elif text == '🛍 Каталог':
+            elif text in ['🛍 Каталог', '🛍 Katalog']:
                 self.show_catalog(message)
             elif text == '🔙 К категориям':
                 self.show_catalog(message)
             elif text.startswith('🛍 '):
                 self.handle_product_selection(message)
-            elif text == '🛒 Корзина':
+            elif text in ['🛒 Корзина', '🛒 Savat']:
                 self.show_cart(message)
-            elif text == '📋 Мои заказы':
+            elif text in ['📋 Мои заказы', '📋 Mening buyurtmalarim']:
                 self.show_user_orders(message)
-            elif text == '👤 Профиль':
+            elif text in ['👤 Профиль', '�� Profil']:
                 self.show_user_profile(message)
-            elif text == '🔍 Поиск':
+            elif text in ['🔍 Поиск', '🔍 Qidiruv']:
                 self.start_product_search(message)
-            elif text == 'ℹ️ Помощь':
+            elif text in ['ℹ️ Помощь', 'ℹ️ Yordam']:
                 self.handle_help_command(message, user_language)
-            elif text == '⭐ Программа лояльности':
-                self.show_loyalty_program(message)
-            elif text == '🎁 Промокоды':
-                self.show_available_promos(message)
-            elif text == '🔙 Главная' or text == '🏠 Главная':
+            elif text == '🔙 Главная' or text == '🏠 Главная' or text == '🏠 Bosh sahifa':
                 self.show_main_menu(message)
             elif text == '🌍 Сменить язык':
                 self.start_language_change(message)
@@ -123,7 +119,7 @@ class MessageHandler:
             # Обрабатываем управление корзиной
             elif text == '🗑 Очистить корзину':
                 self.clear_user_cart(message)
-            elif text == '➕ Добавить товары':
+            elif text == '➕ Добавить товары' or text == '🛍 Перейти в каталог':
                 self.show_catalog(message)
             
             # Неизвестная команда
@@ -146,7 +142,7 @@ class MessageHandler:
             # Пользователь уже зарегистрирован
             user_language = user_data[0][5] or 'ru'
             welcome_text = t('welcome_back', language=user_language)
-            self.bot.send_message(chat_id, welcome_text, create_main_keyboard())
+            self.bot.send_message(chat_id, welcome_text, create_main_keyboard(user_language))
         else:
             # Новый пользователь - начинаем регистрацию
             self.start_registration(message)
@@ -315,7 +311,7 @@ class MessageHandler:
             
             # Приветственное сообщение
             welcome_complete = t('registration_complete', language=language)
-            self.bot.send_message(chat_id, welcome_complete, create_main_keyboard())
+            self.bot.send_message(chat_id, welcome_complete, create_main_keyboard(language))
             
             # Создаем приветственную серию если есть автоматизация
             if hasattr(self.bot, 'marketing_automation') and self.bot.marketing_automation:
@@ -337,21 +333,22 @@ class MessageHandler:
         """Обработка команды помощи"""
         chat_id = message['chat']['id']
         help_text = t('help', language=language)
-        self.bot.send_message(chat_id, help_text, create_main_keyboard())
+        self.bot.send_message(chat_id, help_text, create_main_keyboard(language))
     
     def show_main_menu(self, message):
         """Показ главного меню"""
         chat_id = message['chat']['id']
         telegram_id = message['from']['id']
-        
+
         user_data = self.db.get_user_by_telegram_id(telegram_id)
         if user_data:
             language = user_data[0][5] or 'ru'
             welcome_text = t('welcome_back', language=language)
         else:
+            language = 'ru'
             welcome_text = "👋 Добро пожаловать!"
-        
-        self.bot.send_message(chat_id, welcome_text, create_main_keyboard())
+
+        self.bot.send_message(chat_id, welcome_text, create_main_keyboard(language))
     
     def show_catalog(self, message):
         """Показ каталога товаров"""
@@ -768,8 +765,9 @@ class MessageHandler:
                 success_text += "💳 Ссылка для оплаты будет отправлена отдельно"
             else:
                 success_text += "📞 Мы свяжемся с вами для подтверждения"
-            
-            self.bot.send_message(chat_id, success_text, create_main_keyboard())
+
+            user_language = user_data[0][5] or 'ru'
+            self.bot.send_message(chat_id, success_text, create_main_keyboard(user_language))
             
             # Уведомляем админов
             if self.notification_manager:
@@ -910,7 +908,7 @@ class MessageHandler:
             self.db.update_user_language(user_id, new_language)
             
             success_text = t('language_changed', language=new_language)
-            self.bot.send_message(chat_id, success_text, create_main_keyboard())
+            self.bot.send_message(chat_id, success_text, create_main_keyboard(new_language))
         
         del self.user_states[telegram_id]
     
@@ -1122,10 +1120,10 @@ class MessageHandler:
                 else:
                     msg = {'chat': {'id': chat_id}}
                     self.show_catalog(msg)
-            elif data.startswith('back_to_subcategory_'):
-                # Возврат в каталог
-                msg = {'chat': {'id': chat_id}}
-                self.show_catalog(msg)
+            elif data == 'go_to_cart':
+                # Переход в корзину
+                msg = {'chat': {'id': chat_id}, 'from': {'id': telegram_id}}
+                self.show_cart(msg)
             elif data.startswith('back_to_subcategory_'):
                 try:
                     sid = int(data.split('_')[-1])
@@ -1198,7 +1196,7 @@ class MessageHandler:
                     'inline_keyboard': [
                         [
                             {'text': '🛒 Перейти в корзину', 'callback_data': 'go_to_cart'},
-                            {'text': '🛍 Продолжить покупки', 'callback_data': 'continue_shopping'}
+                            {'text': '🛍 Продолжить покупки', 'callback_data': 'back_to_categories'}
                         ]
                     ]
                 }
@@ -1423,15 +1421,19 @@ class MessageHandler:
                     search_text += f"🛍 {product[1]} - {format_price(product[3])}\n"
                 
                 search_text += f"\n💡 Используйте 🔍 Поиск для расширенного поиска"
-                
+
                 self.bot.send_message(chat_id, search_text, create_main_keyboard())
                 return
-        
+
         # Если ничего не найдено
+        telegram_id = message['from']['id']
+        user_data = self.db.get_user_by_telegram_id(telegram_id)
+        lang = user_data[0][5] if user_data else 'ru'
+
         unknown_text = "❓ Команда не распознана\n\n"
         unknown_text += "💡 Используйте кнопки меню или команды:\n"
         unknown_text += "• /help - справка\n"
         unknown_text += "• /start - главное меню\n"
         unknown_text += "• 🛍 Каталог - просмотр товаров"
-        
-        self.bot.send_message(chat_id, unknown_text, create_main_keyboard())
+
+        self.bot.send_message(chat_id, unknown_text, create_main_keyboard(lang))

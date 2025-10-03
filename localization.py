@@ -33,6 +33,29 @@ class Localization:
                 'btn_profile': '👤 Профиль',
                 'btn_search': '🔍 Поиск',
                 'btn_help': 'ℹ️ Помощь',
+
+                # Помощь
+                'help': """
+ℹ️ <b>Помощь по использованию бота</b>
+
+<b>🛍 Каталог</b>
+Просмотр всех доступных товаров по категориям.
+
+<b>🛒 Корзина</b>
+Просмотр и управление выбранными товарами.
+
+<b>📋 Мои заказы</b>
+Просмотр истории заказов и их статусов.
+
+<b>👤 Профиль</b>
+Управление личными данными и настройками.
+
+<b>🔍 Поиск</b>
+Быстрый поиск товаров по названию.
+
+<b>📞 Контакты</b>
+По всем вопросам обращайтесь к администратору.
+                """,
                 'btn_back': '🔙 Назад',
                 'btn_main': '🏠 Главная',
                 'btn_cancel': '❌ Отмена',
@@ -72,7 +95,10 @@ class Localization:
 🛒 <b>Ваша корзина пуста</b>
 
 Перейдите в каталог, чтобы добавить товары!
-                """
+                """,
+
+                # Дополнительные переводы
+                'language_changed': '✅ Язык успешно изменен!'
             },
             
             'uz': {
@@ -103,6 +129,29 @@ Quyidagi menyudan amalni tanlang:
                 'btn_profile': '👤 Profil',
                 'btn_search': '🔍 Qidiruv',
                 'btn_help': 'ℹ️ Yordam',
+
+                # Помощь
+                'help': """
+ℹ️ <b>Botdan foydalanish bo'yicha yordam</b>
+
+<b>🛍 Katalog</b>
+Barcha mavjud mahsulotlarni toifalar bo'yicha ko'rish.
+
+<b>🛒 Savat</b>
+Tanlangan mahsulotlarni ko'rish va boshqarish.
+
+<b>📋 Mening buyurtmalarim</b>
+Buyurtmalar tarixi va ularning holatini ko'rish.
+
+<b>👤 Profil</b>
+Shaxsiy ma'lumotlar va sozlamalarni boshqarish.
+
+<b>🔍 Qidiruv</b>
+Mahsulotlarni nom bo'yicha tez qidirish.
+
+<b>📞 Kontaktlar</b>
+Barcha savollar bo'yicha administratorga murojaat qiling.
+                """,
                 'btn_back': '🔙 Orqaga',
                 'btn_main': '🏠 Bosh sahifa',
                 'btn_cancel': '❌ Bekor qilish',
@@ -142,7 +191,10 @@ Xaridlaringiz baxtiyor bo'lsin! 🛍
 🛒 <b>Savatingiz bo'sh</b>
 
 Mahsulot qo'shish uchun katalogga o'ting!
-                """
+                """,
+
+                # Дополнительные переводы
+                'language_changed': '✅ Til muvaffaqiyatli o\'zgartirildi!'
             }
         }
     

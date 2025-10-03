@@ -2,18 +2,28 @@
 Клавиатуры для телеграм-бота
 """
 
-def create_main_keyboard():
+def create_main_keyboard(language='ru'):
     """Главная клавиатура"""
-    return {
-        'keyboard': [
-            ['🛍 Каталог', '🛒 Корзина'],
-            ['📋 Мои заказы', '👤 Профиль'],
-            ['🔍 Поиск', 'ℹ️ Помощь'],
-            ['⭐ Программа лояльности', '🎁 Промокоды']
-        ],
-        'resize_keyboard': True,
-        'one_time_keyboard': False
-    }
+    if language == 'uz':
+        return {
+            'keyboard': [
+                ['🛍 Katalog', '🛒 Savat'],
+                ['📋 Mening buyurtmalarim', '👤 Profil'],
+                ['🔍 Qidiruv', 'ℹ️ Yordam']
+            ],
+            'resize_keyboard': True,
+            'one_time_keyboard': False
+        }
+    else:
+        return {
+            'keyboard': [
+                ['🛍 Каталог', '🛒 Корзина'],
+                ['📋 Мои заказы', '👤 Профиль'],
+                ['🔍 Поиск', 'ℹ️ Помощь']
+            ],
+            'resize_keyboard': True,
+            'one_time_keyboard': False
+        }
 
 def create_categories_keyboard(categories):
     """Клавиатура с категориями"""
