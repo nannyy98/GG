@@ -1170,7 +1170,7 @@ def crm_quick_action():
 
 
 @app.route('/categories/toggle/<int:cid>', methods=['POST'])
-@role_required('admin')
+@login_required
 def toggle_category(cid):
     row = db.execute_query('SELECT is_active FROM categories WHERE id=?', (cid,))
     if not row:
