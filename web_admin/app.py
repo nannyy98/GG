@@ -1226,22 +1226,43 @@ def inventory_page():
             FROM products WHERE is_active=1
         ''') or [(0,0,0)]
         product_count, total_stock, stock_cost = rows[0]
-        low_stock = db.execute_query('''
+
+        low_stock_rows = db.execute_query('''
             SELECT id, name, stock FROM products
             WHERE is_active=1 AND stock<=5
             ORDER BY stock ASC LIMIT 20
         ''') or []
-        abc = db.execute_query('''
-            SELECT name, IFNULL(sales_count,0) as sales
-            FROM products WHERE is_active=1
-            ORDER BY sales DESC LIMIT 100
+
+        low_stock = {
+            'critical': [row for row in low_stock_rows if row[2] == 0],
+            'low': [row for row in low_stock_rows if row[2] > 0]
+        }
+
+        top_products = db.execute_query('''
+            SELECT name, stock, COALESCE(cost_price, 0),
+                   stock * COALESCE(cost_price, 0) as total_value
+            FROM products
+            WHERE is_active=1 AND stock > 0
+            ORDER BY total_value DESC
+            LIMIT 10
         ''') or []
+
+        inventory_summary = {
+            'total_products': product_count,
+            'total_units': total_stock,
+            'total_value': stock_cost,
+            'top_value_products': top_products
+        }
+
+        abc_analysis = {
+            'total_value': stock_cost,
+            'categories': {'A': [], 'B': [], 'C': []}
+        }
+
         return render_template('inventory.html',
-                               inventory_summary={'product_count': product_count,
-                                                  'total_stock': total_stock,
-                                                  'stock_cost': stock_cost},
+                               inventory_summary=inventory_summary,
                                low_stock=low_stock,
-                               abc_analysis=abc)
+                               abc_analysis=abc_analysis)
     except Exception as e:
         flash(f'Ошибка загрузки склада: {e}')
         return redirect(url_for('dashboard'))
