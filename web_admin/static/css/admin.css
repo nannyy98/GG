@@ -193,6 +193,13 @@ body {
     background-color: #f8f9fa;
 }
 
+.table img {
+    max-width: 60px;
+    max-height: 60px;
+    object-fit: cover;
+    border-radius: 4px;
+}
+
 .status-badge {
     padding: 0.5rem 1rem;
     border-radius: 20px;

@@ -44,7 +44,7 @@
   {% for p in products %}
   <tr>
     <td>{{ p[0] }}</td>
-    <td>{% if p[8] %}<img src="{{ p[8] }}" alt="img">{% endif %}</td>
+    <td>{% if p[8] %}<img src="{{ p[8] }}" alt="img" style="max-width: 60px; max-height: 60px; object-fit: cover; border-radius: 4px;">{% endif %}</td>
     <td>{{ p[1] }}</td>
     <td>{{ p[2] }}</td>
     <td>{{ p[3] }}</td>
