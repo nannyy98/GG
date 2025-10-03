@@ -361,18 +361,39 @@ def customers():
                          search=search,
                          now=datetime.now())
 
-@app.route('/analytics', methods=['GET'])
+@app.route('/analytics', methods=['GET'], endpoint='analytics_page')
 @login_required
 def analytics_page():
     start_date = request.args.get('start', (datetime.now()-timedelta(days=30)).strftime('%Y-%m-%d'))
     end_date = request.args.get('end', datetime.now().strftime('%Y-%m-%d'))
-    group = request.args.get('group','daily')
-    sales_report = get_sales_report(db, start_date, end_date)
-    series = get_timeseries(db, start_date, end_date, group=group)
+
+    sales_report = {
+        'total_orders': 0,
+        'total_revenue': 0,
+        'avg_order_value': 0
+    }
+
+    try:
+        stats = db.execute_query('''
+            SELECT COUNT(*), IFNULL(SUM(total_amount), 0), IFNULL(AVG(total_amount), 0)
+            FROM orders
+            WHERE DATE(created_at) BETWEEN ? AND ?
+            AND status != 'cancelled'
+        ''', (start_date, end_date))
+
+        if stats and stats[0]:
+            sales_report = {
+                'total_orders': stats[0][0],
+                'total_revenue': stats[0][1],
+                'avg_order_value': stats[0][2]
+            }
+    except Exception as e:
+        flash(f'Ошибка загрузки данных: {e}')
+
     return render_template('analytics.html',
                            sales_report=sales_report,
-                           series=series,
-                           start=start_date, end=end_date, group=group)
+                           start=start_date,
+                           end=end_date)
 
 
 @app.route('/crm')
@@ -1032,26 +1053,6 @@ def export_customers():
     flash('Экспорт клиентов будет добавлен в следующей версии')
     return redirect(url_for('customers'))
 
-if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
-
-@app.route('/finance')
-@login_required
-def finance_page():
-    rows = db.execute_query('''
-        SELECT 
-            IFNULL(SUM(o.total_amount), 0) as revenue,
-            IFNULL(SUM(oi.quantity * COALESCE(p.cost_price,0)), 0) as cost
-        FROM orders o
-        LEFT JOIN order_items oi ON oi.order_id = o.id
-        LEFT JOIN products p ON p.id = oi.product_id
-        WHERE o.status != 'cancelled'
-    ''') or [(0,0)]
-    revenue, cost = rows[0]
-    profit = revenue - cost
-    return render_template('financial.html', revenue=revenue, cost=cost, profit=profit)
-
-
 def _int_or(v, default=0):
     try:
         return int(v)
@@ -1225,44 +1226,6 @@ def financial_page():
     return render_template('financial.html', metrics=metrics, by_cat=by_cat)
 
 
-@app.route('/inventory', methods=['GET'], endpoint='inventory_page')
-@login_required
-def inventory_page():
-    try:
-        rows = db.execute_query('''
-            SELECT COUNT(*), IFNULL(SUM(stock),0), IFNULL(SUM(stock*COALESCE(cost_price,0)),0)
-            FROM products WHERE is_active=1
-        ''') or [(0,0,0)]
-        product_count, total_stock, stock_cost = rows[0]
-        low_stock = db.execute_query('''
-            SELECT id, name, stock FROM products
-            WHERE is_active=1 AND stock<=5
-            ORDER BY stock ASC LIMIT 20
-        ''') or []
-        abc = db.execute_query('''
-            SELECT name, IFNULL(sales_count,0) as sales
-            FROM products WHERE is_active=1
-            ORDER BY sales DESC LIMIT 100
-        ''') or []
-        return render_template('inventory.html',
-                               inventory_summary={'product_count': product_count,
-                                                  'total_stock': total_stock,
-                                                  'stock_cost': stock_cost},
-                               low_stock=low_stock,
-                               abc_analysis=abc)
-    except Exception as e:
-        flash(f'Ошибка загрузки склада: {e}')
-        return redirect(url_for('dashboard'))
 
-@app.route('/financial', methods=['GET'], endpoint='financial_page')
-@login_required
-def financial_page():
-    sales = db.execute_query("SELECT IFNULL(SUM(total_amount),0), COUNT(*), IFNULL(AVG(total_amount),0) FROM orders WHERE status!='cancelled'") or [(0,0,0)]
-    revenue, orders_count, aov = sales[0]
-    cost_row = db.execute_query("SELECT IFNULL(SUM(oi.quantity * COALESCE(p.cost_price,0)),0) FROM order_items oi JOIN products p ON p.id=oi.product_id JOIN orders o ON o.id=oi.order_id WHERE o.status!='cancelled'") or [(0,)]
-    cost = cost_row[0][0] if isinstance(cost_row[0], (list, tuple)) else cost_row[0]
-    profit = (revenue or 0) - (cost or 0)
-    by_cat = db.execute_query("SELECT c.name, IFNULL(SUM(oi.quantity*COALESCE(oi.price,0)),0) as rev FROM categories c LEFT JOIN products p ON p.category_id=c.id LEFT JOIN order_items oi ON oi.product_id=p.id LEFT JOIN orders o ON o.id=oi.order_id AND o.status!='cancelled' GROUP BY c.id, c.name ORDER BY rev DESC LIMIT 10") or []
-    metrics = {'revenue': revenue or 0, 'cost': cost or 0, 'profit': profit or 0, 'orders': orders_count or 0, 'aov': aov or 0}
-    return render_template('financial.html', metrics=metrics, by_cat=by_cat)
-
+if __name__ == '__main__':
+    app.run(debug=True, host='0.0.0.0', port=5000)
