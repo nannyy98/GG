@@ -269,6 +269,53 @@ def add_product():
     categories = db.get_categories()
     return render_template('add_product.html', categories=categories or [])
 
+@app.route('/edit_product/<int:product_id>', methods=['GET', 'POST'])
+@login_required
+def edit_product(product_id):
+    if request.method == 'POST':
+        name = request.form['name'].strip()
+        description = request.form.get('description', '').strip()
+        price = float(request.form['price'])
+        cost_price = float(request.form.get('cost_price', 0) or 0)
+        category_id = int(request.form['category_id'])
+        brand = request.form.get('brand', '').strip()
+        stock = int(request.form.get('stock', 0) or 0)
+
+        image_url = request.form.get('current_image_url', '')
+        if 'image_file' in request.files and request.files['image_file'].filename:
+            file = request.files['image_file']
+            if file and allowed_file(file.filename):
+                ext = file.filename.rsplit('.', 1)[1].lower()
+                filename = str(uuid.uuid4()) + '.' + ext
+                os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+                path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                file.save(path)
+                image_url = url_for('uploaded_file', filename=filename, _external=False)
+
+        res = db.execute_query(
+            """UPDATE products SET name=?, description=?, price=?, category_id=?, brand=?,
+               image_url=?, stock=?, cost_price=? WHERE id=?""",
+            (name, description, price, category_id, brand, image_url, stock, cost_price, product_id)
+        )
+        if res:
+            telegram_bot.trigger_bot_data_reload()
+            flash(f'Товар "{name}" успешно обновлен!')
+            return redirect(url_for('products'))
+        else:
+            flash('Ошибка обновления товара')
+
+    product = db.execute_query('''
+        SELECT id, name, description, price, cost_price, category_id, brand, stock, image_url
+        FROM products WHERE id = ?
+    ''', (product_id,))
+
+    if not product:
+        flash('Товар не найден')
+        return redirect(url_for('products'))
+
+    categories = db.get_categories()
+    return render_template('edit_product.html', product=product[0], categories=categories or [])
+
 @app.route('/static/uploads/<filename>')
 def uploaded_file(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
@@ -360,6 +407,50 @@ def customers():
                          total_pages=total_pages,
                          search=search,
                          now=datetime.now())
+
+@app.route('/customer/<int:customer_id>')
+@login_required
+def customer_profile(customer_id):
+    try:
+        customer = db.execute_query('''
+            SELECT id, telegram_id, full_name, phone, language_code,
+                   created_at, is_active, is_banned
+            FROM users
+            WHERE id = ?
+        ''', (customer_id,))
+
+        if not customer:
+            flash('Клиент не найден')
+            return redirect(url_for('customers'))
+
+        customer = customer[0]
+
+        orders = db.execute_query('''
+            SELECT id, created_at, total_amount, status, delivery_address
+            FROM orders
+            WHERE user_id = ?
+            ORDER BY created_at DESC
+            LIMIT 20
+        ''', (customer_id,)) or []
+
+        stats = db.execute_query('''
+            SELECT
+                COUNT(*) as total_orders,
+                IFNULL(SUM(CASE WHEN status != 'cancelled' THEN total_amount ELSE 0 END), 0) as total_spent,
+                IFNULL(AVG(CASE WHEN status != 'cancelled' THEN total_amount ELSE NULL END), 0) as avg_order
+            FROM orders
+            WHERE user_id = ?
+        ''', (customer_id,))
+
+        stats = stats[0] if stats else (0, 0, 0)
+
+        return render_template('customer_profile.html',
+                             customer=customer,
+                             orders=orders,
+                             stats=stats)
+    except Exception as e:
+        flash(f'Ошибка загрузки профиля: {e}')
+        return redirect(url_for('customers'))
 
 @app.route('/analytics', methods=['GET'], endpoint='analytics_page')
 @login_required
@@ -757,48 +848,84 @@ def order_detail(order_id):
     
     return render_template('order_detail.html', order_data=order_data, db=db)
 
+@app.route('/toggle_product/<int:product_id>', methods=['POST'])
+@login_required
+def toggle_product(product_id):
+    product = db.execute_query('SELECT is_active FROM products WHERE id = ?', (product_id,))
+    if not product:
+        flash('Товар не найден')
+        return redirect(url_for('products'))
+
+    current_status = product[0][0]
+    new_status = 0 if current_status else 1
+
+    result = db.execute_query(
+        'UPDATE products SET is_active = ? WHERE id = ?',
+        (new_status, product_id)
+    )
+
+    if result and result > 0:
+        telegram_bot.trigger_bot_data_reload()
+        status_text = "активирован" if new_status else "скрыт"
+        flash(f'Товар {status_text}!')
+    else:
+        flash('Ошибка изменения статуса товара')
+
+    return redirect(url_for('products'))
+
 @app.route('/toggle_product_status', methods=['POST'])
 @login_required
 def toggle_product_status():
     product_id = request.form['product_id']
     current_status = int(request.form['current_status'])
     new_status = 0 if current_status else 1
-    
+
     result = db.execute_query(
         'UPDATE products SET is_active = ? WHERE id = ?',
         (new_status, product_id)
     )
-    
+
     if result and result > 0:
-        # Сигнализируем боту о необходимости обновления
         telegram_bot.trigger_bot_data_reload()
-        
         status_text = "активирован" if new_status else "скрыт"
         flash(f'Товар {status_text}!')
     else:
         flash('Ошибка изменения статуса товара')
-    
+
     return redirect(url_for('products'))
 
-@app.route('/delete_product', methods=['POST'])
+@app.route('/delete_product/<int:product_id>', methods=['POST'])
 @login_required
-def delete_product():
-    product_id = request.form['product_id']
-    
-    # Получаем название товара для уведомления
-    product = db.get_product_by_id(product_id)
-    product_name = product[1] if product else f"ID {product_id}"
-    
+def delete_product(product_id):
+    product = db.execute_query('SELECT name FROM products WHERE id = ?', (product_id,))
+    product_name = product[0][0] if product else f"ID {product_id}"
+
     result = db.execute_query('DELETE FROM products WHERE id = ?', (product_id,))
-    
+
     if result and result > 0:
-        # Сигнализируем боту о необходимости обновления
         telegram_bot.trigger_bot_data_reload()
-        
         flash(f'Товар "{product_name}" удален!')
     else:
         flash('Ошибка удаления товара')
-    
+
+    return redirect(url_for('products'))
+
+@app.route('/delete_product_old', methods=['POST'])
+@login_required
+def delete_product_old():
+    product_id = request.form['product_id']
+
+    product = db.execute_query('SELECT name FROM products WHERE id = ?', (product_id,))
+    product_name = product[0][0] if product else f"ID {product_id}"
+
+    result = db.execute_query('DELETE FROM products WHERE id = ?', (product_id,))
+
+    if result and result > 0:
+        telegram_bot.trigger_bot_data_reload()
+        flash(f'Товар "{product_name}" удален!')
+    else:
+        flash('Ошибка удаления товара')
+
     return redirect(url_for('products'))
 
 @app.route('/notify_new_product', methods=['POST'])
@@ -1073,20 +1200,132 @@ def test_telegram():
 @app.route('/export_orders')
 @login_required
 def export_orders():
-    flash('Экспорт заказов будет добавлен в следующей версии')
-    return redirect(url_for('orders'))
+    try:
+        import csv
+        from io import StringIO
+
+        orders = db.execute_query('''
+            SELECT o.id, o.created_at, u.full_name, u.phone,
+                   o.total_amount, o.status, o.delivery_address
+            FROM orders o
+            LEFT JOIN users u ON u.id = o.user_id
+            ORDER BY o.created_at DESC
+        ''') or []
+
+        output = StringIO()
+        writer = csv.writer(output)
+        writer.writerow(['ID', 'Дата', 'Клиент', 'Телефон', 'Сумма', 'Статус', 'Адрес'])
+
+        for order in orders:
+            writer.writerow(order)
+
+        response = make_response(output.getvalue())
+        response.headers['Content-Type'] = 'text/csv; charset=utf-8'
+        response.headers['Content-Disposition'] = 'attachment; filename=orders.csv'
+        return response
+    except Exception as e:
+        flash(f'Ошибка экспорта: {e}')
+        return redirect(url_for('orders'))
 
 @app.route('/export_products')
 @login_required
 def export_products():
-    flash('Экспорт товаров будет добавлен в следующей версии')
-    return redirect(url_for('products'))
+    try:
+        import csv
+        from io import StringIO
+
+        products = db.execute_query('''
+            SELECT p.id, p.name, p.price, p.stock, p.is_active,
+                   c.name as category, p.sales_count, p.views_count
+            FROM products p
+            LEFT JOIN categories c ON c.id = p.category_id
+            ORDER BY p.id
+        ''') or []
+
+        output = StringIO()
+        writer = csv.writer(output)
+        writer.writerow(['ID', 'Название', 'Цена', 'Остаток', 'Активен', 'Категория', 'Продаж', 'Просмотров'])
+
+        for product in products:
+            writer.writerow(product)
+
+        response = make_response(output.getvalue())
+        response.headers['Content-Type'] = 'text/csv; charset=utf-8'
+        response.headers['Content-Disposition'] = 'attachment; filename=products.csv'
+        return response
+    except Exception as e:
+        flash(f'Ошибка экспорта: {e}')
+        return redirect(url_for('products'))
 
 @app.route('/export_customers')
 @login_required
 def export_customers():
-    flash('Экспорт клиентов будет добавлен в следующей версии')
-    return redirect(url_for('customers'))
+    try:
+        import csv
+        from io import StringIO
+
+        customers = db.execute_query('''
+            SELECT u.id, u.full_name, u.phone, u.language_code,
+                   u.created_at, u.is_active, u.is_banned,
+                   COUNT(DISTINCT o.id) as orders_count,
+                   IFNULL(SUM(o.total_amount), 0) as total_spent
+            FROM users u
+            LEFT JOIN orders o ON o.user_id = u.id AND o.status != 'cancelled'
+            GROUP BY u.id
+            ORDER BY total_spent DESC
+        ''') or []
+
+        output = StringIO()
+        writer = csv.writer(output)
+        writer.writerow(['ID', 'Имя', 'Телефон', 'Язык', 'Регистрация', 'Активен', 'Заблокирован', 'Заказов', 'Потрачено'])
+
+        for customer in customers:
+            writer.writerow(customer)
+
+        response = make_response(output.getvalue())
+        response.headers['Content-Type'] = 'text/csv; charset=utf-8'
+        response.headers['Content-Disposition'] = 'attachment; filename=customers.csv'
+        return response
+    except Exception as e:
+        flash(f'Ошибка экспорта: {e}')
+        return redirect(url_for('customers'))
+
+@app.route('/export_analytics')
+@login_required
+def export_analytics():
+    try:
+        import csv
+        from io import StringIO
+
+        period = request.args.get('period', '7')
+
+        analytics_data = db.execute_query(f'''
+            SELECT DATE(o.created_at) as date,
+                   COUNT(DISTINCT o.id) as orders,
+                   IFNULL(SUM(o.total_amount), 0) as revenue,
+                   IFNULL(AVG(o.total_amount), 0) as avg_order,
+                   COUNT(DISTINCT o.user_id) as customers
+            FROM orders o
+            WHERE o.created_at >= datetime('now', '-{period} days')
+                  AND o.status != 'cancelled'
+            GROUP BY DATE(o.created_at)
+            ORDER BY date DESC
+        ''') or []
+
+        output = StringIO()
+        writer = csv.writer(output)
+        writer.writerow(['Дата', 'Заказов', 'Выручка', 'Средний чек', 'Клиентов'])
+
+        for row in analytics_data:
+            writer.writerow(row)
+
+        response = make_response(output.getvalue())
+        response.headers['Content-Type'] = 'text/csv; charset=utf-8'
+        response.headers['Content-Disposition'] = f'attachment; filename=analytics_{period}days.csv'
+        return response
+    except Exception as e:
+        flash(f'Ошибка экспорта аналитики: {e}')
+        return redirect(url_for('analytics_page'))
 
 def _int_or(v, default=0):
     try:

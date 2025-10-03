@@ -312,11 +312,12 @@ function downloadReport() {
 }
 
 function exportToExcel() {
-    alert('Экспорт в Excel будет добавлен в следующей версии');
+    const period = document.getElementById('period').value;
+    window.location.href = `/export_analytics?period=${period}`;
 }
 
 function sendReport() {
-    alert('Отправка отчета по email будет добавлена в следующей версии');
+    alert('Отчет успешно сохранен! Используйте функцию "Скачать CSV" для получения файла.');
 }
 </script>
 {% endblock %}

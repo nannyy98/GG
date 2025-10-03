@@ -241,7 +241,7 @@
 {% block scripts %}
 <script>
 function viewCustomerProfile(customerId) {
-    alert(`Просмотр профиля клиента ID: ${customerId}\nФункция будет добавлена в следующей версии`);
+    window.location.href = `/customer/${customerId}`;
 }
 
 function sendPersonalOffer(customerId) {
