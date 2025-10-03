@@ -1327,6 +1327,72 @@ def export_analytics():
         flash(f'Ошибка экспорта аналитики: {e}')
         return redirect(url_for('analytics_page'))
 
+@app.route('/export_financial')
+@login_required
+def export_financial():
+    try:
+        import csv
+        from io import StringIO
+
+        format_type = request.args.get('format', 'excel')
+
+        financial_data = db.execute_query('''
+            SELECT c.name as category,
+                   IFNULL(SUM(oi.quantity * COALESCE(oi.price, 0)), 0) as revenue,
+                   IFNULL(SUM(oi.quantity * COALESCE(p.cost_price, 0)), 0) as cost,
+                   IFNULL(SUM(oi.quantity * COALESCE(oi.price, 0)) - SUM(oi.quantity * COALESCE(p.cost_price, 0)), 0) as profit,
+                   COUNT(DISTINCT o.id) as orders
+            FROM categories c
+            LEFT JOIN products p ON p.category_id = c.id
+            LEFT JOIN order_items oi ON oi.product_id = p.id
+            LEFT JOIN orders o ON o.id = oi.order_id AND o.status != 'cancelled'
+            GROUP BY c.id, c.name
+            ORDER BY revenue DESC
+        ''') or []
+
+        output = StringIO()
+        writer = csv.writer(output)
+        writer.writerow(['Категория', 'Выручка', 'Себестоимость', 'Прибыль', 'Маржа %', 'Заказов'])
+
+        for row in financial_data:
+            margin = ((row[3] / row[1] * 100) if row[1] > 0 else 0)
+            writer.writerow([row[0], row[1], row[2], row[3], f'{margin:.1f}%', row[4]])
+
+        total_row = db.execute_query('''
+            SELECT
+                IFNULL(SUM(oi.quantity * COALESCE(oi.price, 0)), 0) as revenue,
+                IFNULL(SUM(oi.quantity * COALESCE(p.cost_price, 0)), 0) as cost,
+                COUNT(DISTINCT o.id) as orders
+            FROM orders o
+            JOIN order_items oi ON oi.order_id = o.id
+            JOIN products p ON p.id = oi.product_id
+            WHERE o.status != 'cancelled'
+        ''')
+
+        if total_row and total_row[0]:
+            total_revenue = total_row[0][0]
+            total_cost = total_row[0][1]
+            total_profit = total_revenue - total_cost
+            total_margin = ((total_profit / total_revenue * 100) if total_revenue > 0 else 0)
+            total_orders = total_row[0][2]
+
+            writer.writerow([])
+            writer.writerow(['ИТОГО', total_revenue, total_cost, total_profit, f'{total_margin:.1f}%', total_orders])
+
+        response = make_response(output.getvalue())
+
+        if format_type == 'csv':
+            response.headers['Content-Type'] = 'text/csv; charset=utf-8'
+            response.headers['Content-Disposition'] = 'attachment; filename=financial_report.csv'
+        else:
+            response.headers['Content-Type'] = 'application/vnd.ms-excel; charset=utf-8'
+            response.headers['Content-Disposition'] = 'attachment; filename=financial_report.xls'
+
+        return response
+    except Exception as e:
+        flash(f'Ошибка экспорта финансового отчёта: {e}')
+        return redirect(url_for('financial_page'))
+
 def _int_or(v, default=0):
     try:
         return int(v)

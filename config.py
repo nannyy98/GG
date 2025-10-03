@@ -63,6 +63,14 @@ BOT_CONFIG = {
     'admin_name': os.getenv('ADMIN_NAME', 'Admin')
 }
 
+# Контактная информация
+CONTACT_INFO = {
+    'support_phone': os.getenv('SUPPORT_PHONE', '+998901234567'),
+    'support_telegram': os.getenv('SUPPORT_TELEGRAM', '@your_shop_support'),
+    'call_center_phone': os.getenv('CALL_CENTER_PHONE', '+998901234567'),
+    'working_hours': os.getenv('WORKING_HOURS', '9:00 - 18:00 (Пн-Пт)')
+}
+
 # Сообщения бота
 MESSAGES = {
     'welcome_new': """

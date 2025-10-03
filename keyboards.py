@@ -9,7 +9,8 @@ def create_main_keyboard(language='ru'):
             'keyboard': [
                 ['🛍 Katalog', '🛒 Savat'],
                 ['📋 Mening buyurtmalarim', '👤 Profil'],
-                ['🔍 Qidiruv', 'ℹ️ Yordam']
+                ['🔍 Qidiruv', 'ℹ️ Yordam'],
+                ['📞 Biz bilan bog\'lanish']
             ],
             'resize_keyboard': True,
             'one_time_keyboard': False
@@ -19,7 +20,8 @@ def create_main_keyboard(language='ru'):
             'keyboard': [
                 ['🛍 Каталог', '🛒 Корзина'],
                 ['📋 Мои заказы', '👤 Профиль'],
-                ['🔍 Поиск', 'ℹ️ Помощь']
+                ['🔍 Поиск', 'ℹ️ Помощь'],
+                ['📞 Связаться с нами']
             ],
             'resize_keyboard': True,
             'one_time_keyboard': False

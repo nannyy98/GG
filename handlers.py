@@ -89,6 +89,8 @@ class MessageHandler:
                 self.start_product_search(message)
             elif text in ['ℹ️ Помощь', 'ℹ️ Yordam']:
                 self.handle_help_command(message, user_language)
+            elif text in ['📞 Связаться с нами', '📞 Biz bilan bog\'lanish']:
+                self.handle_contact_request(message, user_language)
             elif text == '🔙 Главная' or text == '🏠 Главная' or text == '🏠 Bosh sahifa':
                 self.show_main_menu(message)
             elif text == '🌍 Сменить язык':
@@ -334,7 +336,59 @@ class MessageHandler:
         chat_id = message['chat']['id']
         help_text = t('help', language=language)
         self.bot.send_message(chat_id, help_text, create_main_keyboard(language))
-    
+
+    def handle_contact_request(self, message, language='ru'):
+        """Обработка запроса на связь"""
+        from config import CONTACT_INFO
+        chat_id = message['chat']['id']
+
+        if language == 'uz':
+            contact_text = f"""
+📞 <b>Biz bilan bog'lanish</b>
+
+🏢 <b>Call-центр:</b>
+📱 {CONTACT_INFO['call_center_phone']}
+
+💬 <b>Telegram yordam:</b>
+👤 {CONTACT_INFO['support_telegram']}
+
+🕐 <b>Ish vaqti:</b>
+{CONTACT_INFO['working_hours']}
+
+📧 Savollaringiz bo'lsa, biz bilan bog'laning!
+Biz doimo yordam berishga tayyormiz! 🤝
+"""
+        else:
+            contact_text = f"""
+📞 <b>Связаться с нами</b>
+
+🏢 <b>Call-центр:</b>
+📱 {CONTACT_INFO['call_center_phone']}
+
+💬 <b>Telegram поддержка:</b>
+👤 {CONTACT_INFO['support_telegram']}
+
+🕐 <b>Время работы:</b>
+{CONTACT_INFO['working_hours']}
+
+📧 Если у вас есть вопросы, свяжитесь с нами!
+Мы всегда рады помочь! 🤝
+"""
+
+        keyboard = {
+            'inline_keyboard': [
+                [
+                    {'text': '📱 Позвонить', 'url': f'tel:{CONTACT_INFO["call_center_phone"]}'},
+                    {'text': '💬 Telegram', 'url': f'https://t.me/{CONTACT_INFO["support_telegram"].replace("@", "")}'}
+                ],
+                [
+                    {'text': '🔙 Назад' if language == 'ru' else '🔙 Orqaga', 'callback_data': 'back_to_main'}
+                ]
+            ]
+        }
+
+        self.bot.send_message(chat_id, contact_text, keyboard)
+
     def show_main_menu(self, message):
         """Показ главного меню"""
         chat_id = message['chat']['id']
