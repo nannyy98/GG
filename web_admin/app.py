@@ -924,6 +924,41 @@ def edit_category():
     
     return redirect(url_for('categories'))
 
+@app.route('/delete_category', methods=['POST'])
+@login_required
+def delete_category():
+    category_id = request.form.get('cid')
+    if not category_id:
+        flash('ID категории не указан')
+        return redirect(url_for('categories'))
+
+    try:
+        # Проверяем, есть ли товары в этой категории
+        products = db.execute_query(
+            'SELECT COUNT(*) FROM products WHERE category_id = ?',
+            (category_id,)
+        )
+
+        if products and products[0][0] > 0:
+            flash(f'Невозможно удалить категорию: в ней есть {products[0][0]} товар(ов)')
+            return redirect(url_for('categories'))
+
+        # Удаляем категорию
+        result = db.execute_query(
+            'DELETE FROM categories WHERE id = ?',
+            (category_id,)
+        )
+
+        if result:
+            telegram_bot.trigger_bot_data_reload()
+            flash('Категория успешно удалена!')
+        else:
+            flash('Ошибка удаления категории')
+    except Exception as e:
+        flash(f'Ошибка: {e}')
+
+    return redirect(url_for('categories'))
+
 @app.route('/reload_bot_data', methods=['POST'])
 @login_required
 def reload_bot_data():
